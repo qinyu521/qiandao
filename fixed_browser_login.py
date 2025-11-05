@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-增强版登录脚本 v2.0 - 解决多账号登录问题
+浏览器修复版登录脚本 - 解决Chrome安装问题
 """
 
 import os
@@ -16,9 +16,27 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import (
     NoSuchElementException,
     TimeoutException,
-    WebDriverException,
-    ElementClickInterceptedException
+    WebDriverException
 )
+
+def find_chrome_binary():
+    """查找Chrome二进制文件的可能位置"""
+    possible_paths = [
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/opt/google/chrome/chrome',
+        '/usr/local/bin/google-chrome',
+        '/snap/bin/chromium'
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path) and os.path.isfile(path):
+            print(f"✅ 找到Chrome二进制文件: {path}")
+            return path
+    
+    print("❌ 未找到Chrome二进制文件")
+    return None
 
 def setup_chrome_options():
     """设置Chrome选项"""
@@ -42,9 +60,15 @@ def setup_chrome_options():
     return chrome_options
 
 def create_driver():
-    """创建WebDriver实例"""
+    """创建WebDriver实例，支持多种浏览器路径"""
     try:
         chrome_options = setup_chrome_options()
+        
+        # 尝试自动查找Chrome二进制文件
+        chrome_binary = find_chrome_binary()
+        if chrome_binary:
+            chrome_options.binary_location = chrome_binary
+        
         driver = webdriver.Chrome(options=chrome_options)
         driver.implicitly_wait(15)
         
@@ -57,7 +81,26 @@ def create_driver():
             '''
         })
         
+        print("✅ 浏览器驱动初始化成功")
         return driver
+    except WebDriverException as e:
+        print(f"❌ 浏览器驱动初始化失败: {str(e)}")
+        
+        # 尝试使用ChromeDriver的备用方法
+        try:
+            from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
+            
+            print("🔄 尝试使用webdriver-manager自动管理ChromeDriver")
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            driver.implicitly_wait(15)
+            print("✅ 使用webdriver-manager成功初始化浏览器")
+            return driver
+        except Exception as e2:
+            print(f"❌ webdriver-manager也失败: {str(e2)}")
+            traceback.print_exc()
+            return None
     except Exception as e:
         print(f"❌ 创建浏览器失败: {str(e)}")
         traceback.print_exc()
@@ -198,14 +241,6 @@ def login_account(driver, username, password, account_num):
         print("❌ 操作超时 - 页面可能加载缓慢")
         traceback.print_exc()
         return False
-    except ElementClickInterceptedException:
-        print("❌ 点击被拦截 - 可能有弹窗或其他元素遮挡")
-        traceback.print_exc()
-        return False
-    except WebDriverException as e:
-        print(f"❌ 浏览器异常: {str(e)}")
-        traceback.print_exc()
-        return False
     except Exception as e:
         print(f"❌ 登录过程异常: {str(e)}")
         traceback.print_exc()
@@ -214,7 +249,7 @@ def login_account(driver, username, password, account_num):
 def main():
     """主函数"""
     print("=" * 60)
-    print("增强版登录脚本 v2.0")
+    print("浏览器修复版登录脚本 v3.0")
     print(f"运行时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
     
@@ -257,44 +292,37 @@ def main():
         traceback.print_exc()
         sys.exit(1)
     
-    # 创建浏览器实例
-    print("\n2. 浏览器初始化:")
-    driver = create_driver()
-    if not driver:
-        print("❌ 无法初始化浏览器，脚本退出")
-        sys.exit(1)
-    
     # 登录每个账号
-    print(f"\n3. 开始登录 {len(valid_accounts)} 个账号:")
+    print(f"\n2. 开始登录 {len(valid_accounts)} 个账号:")
     results = []
     all_success = True
     
     for i, (username, password) in enumerate(valid_accounts, 1):
-        # 为每个账号使用新的浏览器实例，避免会话冲突
-        if i > 1:
-            print(f"\n🔄 为账号 {i} 创建新的浏览器实例...")
-            driver.quit()
-            driver = create_driver()
-            if not driver:
-                print(f"❌ 无法为账号 {i} 创建浏览器，跳过")
-                results.append((username, False))
-                all_success = False
-                continue
+        # 为每个账号创建新的浏览器实例
+        print(f"\n🔄 为账号 {i} 创建浏览器实例...")
+        driver = create_driver()
+        
+        if not driver:
+            print(f"❌ 无法为账号 {i} 创建浏览器，跳过")
+            results.append((username, False))
+            all_success = False
+            continue
         
         # 登录前等待，避免被检测
-        wait_time = 5 + (i * 2)  # 账号越多，等待时间越长
+        wait_time = 5 + (i * 2)
         print(f"\n⏰ 等待 {wait_time} 秒后登录账号 {i}...")
         time.sleep(wait_time)
         
-        success = login_account(driver, username, password, i)
-        results.append((username, success))
-        if not success:
-            all_success = False
-    
-    # 清理资源
-    if driver:
-        driver.quit()
-        print("\n🔒 所有浏览器实例已关闭")
+        try:
+            success = login_account(driver, username, password, i)
+            results.append((username, success))
+            if not success:
+                all_success = False
+        finally:
+            # 确保关闭浏览器
+            if driver:
+                driver.quit()
+                print(f"🔒 账号 {i} 的浏览器已关闭")
     
     # 生成结果报告
     print(f"\n{'=' * 60}")
