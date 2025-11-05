@@ -1,10 +1,10 @@
-name: Final Working Login
+name: Run Login Now
 
 on:
   workflow_dispatch:
 
 jobs:
-  login:
+  run-login:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -12,16 +12,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: List all files
+    - name: Show repository structure
       run: |
-        echo "=== All files in repository ==="
-        find . -type f | head -20
+        echo "=== Repository Structure ==="
+        find . -type f | head -30
         echo ""
-        echo "=== Files in root ==="
-        ls -la
+        echo "=== Python files in root ==="
+        ls -la *.py || echo "No Python files in root"
         echo ""
-        echo "=== Python files ==="
-        find . -name "*.py"
+        echo "=== Python files in subdirectories ==="
+        find . -name "*.py" -type f
         
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -38,36 +38,39 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
         
-    - name: Verify Chrome
+    - name: Verify setup
       run: |
+        echo "=== Setup Verification ==="
+        python --version
         google-chrome --version
-        which google-chrome
+        pip list | grep selenium
         
-    - name: Test environment variables
+    - name: Environment variable test
       run: |
-        echo "=== Environment Variables ==="
+        echo "=== Environment Test ==="
         echo "NETLIB_ACCOUNTS exists: ${NETLIB_ACCOUNTS:+Yes}${NETLIB_ACCOUNTS:-No}"
         echo "NETLIB_ACCOUNTS length: ${#NETLIB_ACCOUNTS}"
         echo ""
-        echo "Python can see it:"
+        echo "Python check:"
         python -c "import os; print('NETLIB_ACCOUNTS in os.environ:', 'NETLIB_ACCOUNTS' in os.environ)"
         python -c "import os; print('NETLIB_ACCOUNTS length:', len(os.environ.get('NETLIB_ACCOUNTS', '')))"
+        python -c "import os; print('NETLIB_ACCOUNTS preview:', os.environ.get('NETLIB_ACCOUNTS', '')[:30])"
         
       env:
         NETLIB_ACCOUNTS: ${{ secrets.NETLIB_ACCOUNTS }}
     
-    - name: Run login script (using correct path)
+    - name: Run login script
       run: |
-        echo "=== Running login script ==="
-        # 查找所有 Python 脚本
-        find . -name "fixed_login.py" -type f
-        # 运行找到的脚本
-        if [ -f "./fixed_login.py" ]; then
-          python ./fixed_login.py
-        elif [ -f "./netlib-login-script/fixed_login.py" ]; then
-          python ./netlib-login-script/fixed_login.py
+        echo "=== Running Login Script ==="
+        # 检查脚本文件
+        if [ -f "./run_login.py" ]; then
+          echo "Found run_login.py in current directory"
+          python run_login.py
+        elif [ -f "./netlib-login-script/run_login.py" ]; then
+          echo "Found run_login.py in netlib-login-script directory"
+          python netlib-login-script/run_login.py
         else
-          echo "❌ fixed_login.py not found in current directory or netlib-login-script/"
+          echo "❌ run_login.py not found!"
           find . -name "*.py"
           exit 1
         fi
@@ -78,7 +81,7 @@ jobs:
     - name: Upload results
       uses: actions/upload-artifact@v4
       with:
-        name: final-login-results
+        name: login-results
         path: |
           *.png
           *.log
