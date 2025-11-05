@@ -1,0 +1,85 @@
+name: Final Working Login
+
+on:
+  workflow_dispatch:
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: List all files
+      run: |
+        echo "=== All files in repository ==="
+        find . -type f | head -20
+        echo ""
+        echo "=== Files in root ==="
+        ls -la
+        echo ""
+        echo "=== Python files ==="
+        find . -name "*.py"
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install selenium
+        
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+    - name: Verify Chrome
+      run: |
+        google-chrome --version
+        which google-chrome
+        
+    - name: Test environment variables
+      run: |
+        echo "=== Environment Variables ==="
+        echo "NETLIB_ACCOUNTS exists: ${NETLIB_ACCOUNTS:+Yes}${NETLIB_ACCOUNTS:-No}"
+        echo "NETLIB_ACCOUNTS length: ${#NETLIB_ACCOUNTS}"
+        echo ""
+        echo "Python can see it:"
+        python -c "import os; print('NETLIB_ACCOUNTS in os.environ:', 'NETLIB_ACCOUNTS' in os.environ)"
+        python -c "import os; print('NETLIB_ACCOUNTS length:', len(os.environ.get('NETLIB_ACCOUNTS', '')))"
+        
+      env:
+        NETLIB_ACCOUNTS: ${{ secrets.NETLIB_ACCOUNTS }}
+    
+    - name: Run login script (using correct path)
+      run: |
+        echo "=== Running login script ==="
+        # 查找所有 Python 脚本
+        find . -name "fixed_login.py" -type f
+        # 运行找到的脚本
+        if [ -f "./fixed_login.py" ]; then
+          python ./fixed_login.py
+        elif [ -f "./netlib-login-script/fixed_login.py" ]; then
+          python ./netlib-login-script/fixed_login.py
+        else
+          echo "❌ fixed_login.py not found in current directory or netlib-login-script/"
+          find . -name "*.py"
+          exit 1
+        fi
+        
+      env:
+        NETLIB_ACCOUNTS: ${{ secrets.NETLIB_ACCOUNTS }}
+    
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      with:
+        name: final-login-results
+        path: |
+          *.png
+          *.log
+      if: always()
