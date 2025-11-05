@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-最终版登录脚本 - 确保能运行
+立即运行的登录脚本
 """
 
 import os
@@ -16,7 +16,7 @@ from selenium.webdriver.chrome.options import Options
 def main():
     """主函数"""
     print("=" * 60)
-    print("最终版登录脚本")
+    print("立即运行的登录脚本")
     print(f"运行时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
     
@@ -35,14 +35,20 @@ def main():
         accounts = accounts_str.split(',')
         print(f"✅ 解析出 {len(accounts)} 个账号")
         
+        valid_accounts = []
         for i, account in enumerate(accounts, 1):
             if ':' in account:
                 username, password = account.split(':', 1)
                 username = username.strip()
                 password = password.strip()
+                valid_accounts.append((username, password))
                 print(f"   账号 {i}: {username}")
             else:
                 print(f"❌ 账号 {i} 格式错误: {account}")
+                
+        if not valid_accounts:
+            print("❌ 没有有效的账号")
+            sys.exit(1)
                 
     except Exception as e:
         print(f"❌ 解析账号失败: {e}")
@@ -67,14 +73,9 @@ def main():
     
     # 登录每个账号
     print("\n3. 开始登录:")
-    for i, account in enumerate(accounts, 1):
-        if ':' not in account:
-            continue
-            
-        username, password = account.split(':', 1)
-        username = username.strip()
-        password = password.strip()
-        
+    all_success = True
+    
+    for i, (username, password) in enumerate(valid_accounts, 1):
         print(f"\n{'=' * 50}")
         print(f"账号 {i}: {username}")
         print(f"{'=' * 50}")
@@ -107,7 +108,8 @@ def main():
                 '//input[@placeholder="Password"]',
                 '//input[@name="password"]', 
                 '//input[type="password"]',
-                '//form//input[2]'
+                '//form//input[2]',
+                '//div[contains(text(), "Password")]/following-sibling::input'
             ]
             
             for selector in password_selectors:
@@ -119,11 +121,12 @@ def main():
                     password_found = True
                     break
                 except Exception as e:
-                    print(f"❌ 选择器 {selector} 失败: {e}")
+                    print(f"❌ 选择器 {selector} 失败: {str(e)[:50]}...")
                     continue
             
             if not password_found:
                 print("❌ 所有密码选择器都失败")
+                all_success = False
                 continue
             
             # 提交登录
@@ -136,18 +139,26 @@ def main():
             try:
                 driver.find_element(By.LINK_TEXT, 'Login')
                 print("❌ 登录失败 - 仍有登录按钮")
+                all_success = False
             except:
                 print("✅ 登录成功 - 无登录按钮")
                 
         except Exception as e:
-            print(f"❌ 登录过程出错: {e}")
+            print(f"❌ 登录过程出错: {str(e)[:100]}...")
+            all_success = False
             continue
     
     # 清理
     driver.quit()
     print("\n✅ 浏览器已关闭")
     print("=" * 60)
-    print("脚本执行完成")
+    
+    if all_success:
+        print("🎉 所有账号登录成功！")
+        sys.exit(0)
+    else:
+        print("⚠️  部分或所有账号登录失败")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
