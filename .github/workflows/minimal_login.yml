@@ -1,0 +1,61 @@
+name: Minimal Login Workflow
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天UTC时间0点运行
+  workflow_dispatch:
+
+jobs:
+  minimal-login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install selenium webdriver-manager
+        
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+    - name: Verify setup
+      run: |
+        echo "=== Setup Verification ==="
+        python --version
+        google-chrome --version
+        pip list | grep selenium
+        
+    - name: Show environment variables
+      run: |
+        echo "=== Environment Variables ==="
+        echo "NETLIB_ACCOUNTS set: ${NETLIB_ACCOUNTS:+Yes}${NETLIB_ACCOUNTS:-No}"
+        echo "NETLIB_ACCOUNTS length: ${#NETLIB_ACCOUNTS}"
+        echo "NETLIB_USERNAME set: ${NETLIB_USERNAME:+Yes}${NETLIB_USERNAME:-No}"
+        
+    - name: Run minimal login script
+      run: |
+        python minimal_login.py
+      env:
+        NETLIB_ACCOUNTS: ${{ secrets.NETLIB_ACCOUNTS }}
+        NETLIB_USERNAME: ${{ secrets.NETLIB_USERNAME }}
+        NETLIB_PASSWORD: ${{ secrets.NETLIB_PASSWORD }}
+        
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: minimal-login-results
+        path: |
+          *.log
+          *.txt
+      if: always()
