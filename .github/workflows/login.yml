@@ -1,4 +1,4 @@
-name: Netlib Auto Login
+name: Enhanced Netlib Auto Login
 
 on:
   # 每天运行一次，北京时间上午8点
@@ -8,8 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  login:
+  enhanced-login:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     
     steps:
     - name: Checkout code
@@ -26,24 +27,73 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Install Chrome
+    - name: Install Chrome and dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
+        sudo apt-get install -y google-chrome-stable chromium-chromedriver
+        # 验证Chrome安装
+        google-chrome --version
+        # 验证ChromeDriver
+        chromedriver --version
         
-    - name: Run login script
+    - name: System information
       run: |
-        python login_script.py
+        echo "=== System Information ==="
+        uname -a
+        echo "=== Python Information ==="
+        python --version
+        pip --version
+        echo "=== Chrome Information ==="
+        google-chrome --version || chromium --version
+        echo "=== Environment Variables ==="
+        env | grep -E "(NETLIB_|GITHUB_)" | sort
+        
+    - name: Enhanced environment variable test
+      run: |
+        echo "=== Enhanced Environment Test ==="
+        echo "NETLIB_ACCOUNTS set: ${NETLIB_ACCOUNTS:+Yes}${NETLIB_ACCOUNTS:-No}"
+        echo "NETLIB_ACCOUNTS length: ${#NETLIB_ACCOUNTS}"
+        echo "NETLIB_USERNAME1 set: ${NETLIB_USERNAME1:+Yes}${NETLIB_USERNAME1:-No}"
+        echo "NETLIB_PASSWORD1 set: ${NETLIB_PASSWORD1:+Yes}${NETLIB_PASSWORD1:-No}"
+        echo "NETLIB_USERNAME2 set: ${NETLIB_USERNAME2:+Yes}${NETLIB_USERNAME2:-No}"
+        echo "NETLIB_PASSWORD2 set: ${NETLIB_PASSWORD2:+Yes}${NETLIB_PASSWORD2:-No}"
+        
+        # 测试变量是否真的传递到了环境中
+        python -c "import os; print('Python can see NETLIB_ACCOUNTS:', 'NETLIB_ACCOUNTS' in os.environ)"
+        python -c "import os; print('Python can see NETLIB_USERNAME1:', 'NETLIB_USERNAME1' in os.environ)"
+        
+    - name: Run enhanced login script
+      run: |
+        python enhanced_login.py
       env:
-        # 从GitHub Secrets中获取凭据
+        # 方式1: NETLIB_ACCOUNTS (推荐)
+        NETLIB_ACCOUNTS: ${{ secrets.NETLIB_ACCOUNTS }}
+        
+        # 方式2: 数字后缀账号
+        NETLIB_USERNAME1: ${{ secrets.NETLIB_USERNAME1 }}
+        NETLIB_PASSWORD1: ${{ secrets.NETLIB_PASSWORD1 }}
+        NETLIB_USERNAME2: ${{ secrets.NETLIB_USERNAME2 }}
+        NETLIB_PASSWORD2: ${{ secrets.NETLIB_PASSWORD2 }}
+        
+        # 方式3: JSON格式
+        NETLIB_ACCOUNTS_JSON: ${{ secrets.NETLIB_ACCOUNTS_JSON }}
+        
+        # 方式4: 单个账号
         NETLIB_USERNAME: ${{ secrets.NETLIB_USERNAME }}
         NETLIB_PASSWORD: ${{ secrets.NETLIB_PASSWORD }}
         
-    - name: Upload logs
+        # 调试模式
+        PYTHONUNBUFFERED: 1
+        LOG_LEVEL: INFO
+        
+    - name: Upload all artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: login-logs
+        name: complete-login-results
         path: |
-          login_logs.log
+          enhanced_login_logs.log
+          login_report.json
           last_login_status.txt
+          *.png  # 截图文件
+          *.log  # 所有日志文件
       if: always()
